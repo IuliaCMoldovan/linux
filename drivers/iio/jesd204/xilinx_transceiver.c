@@ -1279,7 +1279,49 @@ int xilinx_xcvr_write_out_div(struct xilinx_xcvr *xcvr, unsigned int drp_port,
 }
 EXPORT_SYMBOL_GPL(xilinx_xcvr_write_out_div);
 
-static unsigned int xilinx_xcvr_prog_div_to_val(unsigned int div)
+static unsigned int xilinx_xcvr_gth4_prog_div_to_val(unsigned int div)
+{
+	switch (div) {
+	case 0:
+		return 32768;
+	case 4:
+		return 57432;
+	case 5:
+		return 57464;
+	case 8:
+		return 57408;
+	case 10:
+		return 57440;
+	case 16:
+		return 57410;
+	case 17: /* This is 16.5 rounded to 17 */
+		return 57880;
+	case 20:
+		return 57442;
+	case 32:
+		return 57414;
+	case 33:
+		return 57856;
+	case 40:
+		return 57415;
+	case 64:
+		return 57422;
+	case 66:
+		return 57858;
+	case 80:
+		return 57423;
+	case 100:
+		return 57455;
+	case 128:
+		return 24654;
+	case 132:
+		return 57862;
+	default:
+		return 32768; /* 0 disabled */
+	}
+}
+
+static unsigned int xilinx_xcvr_gty4_gth3_prog_div_to_val(unsigned int div)
 {
 	switch (div) {
 	case 0:
@@ -1317,20 +1359,41 @@ static unsigned int xilinx_xcvr_prog_div_to_val(unsigned int div)
 	}
 }
 
-static int xilinx_xcvr_gth34_write_progdiv_div(struct xilinx_xcvr *xcvr,
+static int xilinx_xcvr_gth3_gty4_write_progdiv_div(struct xilinx_xcvr *xcvr,
 	unsigned int drp_port, int rx_prog_div, int tx_prog_div)
 {
 	int ret;
 
 	if (rx_prog_div >= 0) {
 		ret = xilinx_xcvr_drp_update(xcvr, drp_port, 0xC6, 0xFFFF,
-			xilinx_xcvr_prog_div_to_val(rx_prog_div));
+			xilinx_xcvr_gty4_gth3_prog_div_to_val(rx_prog_div));
 		if (ret)
 			return ret;
 	}
 	if (tx_prog_div >= 0) {
 		ret = xilinx_xcvr_drp_update(xcvr, drp_port, 0x3E, 0xFFFF,
-			xilinx_xcvr_prog_div_to_val(tx_prog_div));
+			xilinx_xcvr_gty4_gth3_prog_div_to_val(tx_prog_div));
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int xilinx_xcvr_gth4_write_progdiv_div(struct xilinx_xcvr *xcvr,
+	unsigned int drp_port, int rx_prog_div, int tx_prog_div)
+{
+	int ret;
+
+	if (rx_prog_div >= 0) {
+		ret = xilinx_xcvr_drp_update(xcvr, drp_port, 0xC6, 0xFFFF,
+			xilinx_xcvr_gth4_prog_div_to_val(rx_prog_div));
+		if (ret)
+			return ret;
+	}
+	if (tx_prog_div >= 0) {
+		ret = xilinx_xcvr_drp_update(xcvr, drp_port, 0x3E, 0xFFFF,
+			xilinx_xcvr_gth4_prog_div_to_val(tx_prog_div));
 		if (ret)
 			return ret;
 	}
@@ -1344,9 +1407,11 @@ int xilinx_xcvr_write_prog_div(struct xilinx_xcvr *xcvr, unsigned int drp_port,
 	switch (xcvr->type) {
 
 	case XILINX_XCVR_TYPE_US_GTH3:
-	case XILINX_XCVR_TYPE_US_GTH4:
 	case XILINX_XCVR_TYPE_US_GTY4:
-		return xilinx_xcvr_gth34_write_progdiv_div(xcvr, drp_port,
+		return xilinx_xcvr_gth3_gty4_write_progdiv_div(xcvr, drp_port,
+			rx_prog_div, tx_prog_div);
+	case XILINX_XCVR_TYPE_US_GTH4:
+		return xilinx_xcvr_gth4_write_progdiv_div(xcvr, drp_port,
 			rx_prog_div, tx_prog_div);
 	default:
 		return -EINVAL;
