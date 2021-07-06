@@ -86,6 +86,34 @@
 		dmas = <&tx_dma 0>;
 		dma-names = "tx";
 	};
+
+        trigger@43C000000 {
+                compatible = "xlnx,axi-ad-mc-adc-1.00.a";
+                reg = <0x43C00000 0x10000>;
+                dmas = <&dma_trigger 0>;
+                dma-names = "dma-trigger";
+        };
+
+        dma_trigger: dma@43C10000 {
+                compatible = "adi,axi-dmac-1.00.a";
+                reg = <0x43C10000 0x10000>;
+                #dma-cells = <1>;
+                interrupts = <0 54 IRQ_TYPE_LEVEL_HIGH>;
+                clocks = <&clkc 15>;
+
+                adi,channels {
+                        #size-cells = <0>;
+                        #address-cells = <1>;
+
+                        dma-channel@0 {
+                                reg = <0>;
+                                adi,source-bus-width = <64>;
+                                adi,source-bus-type = <2>;
+                                adi,destination-bus-width = <64>;
+                                adi,destination-bus-type = <0>;
+                        };
+                };
+        };
 };
 
 &spi0 {
