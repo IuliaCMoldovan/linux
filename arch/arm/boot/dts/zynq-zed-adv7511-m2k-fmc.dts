@@ -42,16 +42,15 @@
 
 		sc-cal-mux0-gpio = <&gpio_exp 6 0>;
 		sc-cal-mux1-gpio = <&gpio_exp 5 0>;
-		//en awg1 -> 16 ?
-		//en awg2 -> 15 ?
-		//en sc -> 3 ?
 
-		en-awg1-gpio = <&gpio_exp 15 0>;
-		en-awg2-gpio = <&gpio_exp 14 0>;
-		en-sc1-gpio = <&gpio_exp 5 0>; // not sure about this 
-		en-sc2-gpio = <&gpio_exp 4 0>; // not sure about this 
+		en-awg1-gpio = <&gpio_exp 16 0>;
+		en-awg2-gpio = <&gpio_exp 15 0>;
 
-		en-usr-pow-gpio = <&gpio_exp 6 0>;
+		// newly added --- 
+		en-usr-pow-pos-gpio = <&gpio_exp 1 0>;
+		en-usr-pow-neg-gpio = <&gpio_exp 2 0>;
+		en-sc-gpio = <&gpio_exp 3 0>;
+		// ---
 
 		en-sc1-lg-gpio = <&gpio_exp 11 0>;
 		en-sc1-hg-gpio = <&gpio_exp 12 0>;
@@ -95,7 +94,8 @@
 &spi0 {
 	status = "okay";
 
-	converter_clock: pll@0 {
+	//  was pll@0
+	converter_clock: pll@1 {
 		compatible = "adi,adf4360-9";
 		reg = <1>;
 		spi-max-frequency = <2000000>;
@@ -110,7 +110,8 @@
 		adi,loop-filter-pfd-frequency-hz = <5000000>;
 	};
 
-	converter@1 {
+	// was converter@1
+	converter@0 {
 		compatible = "adi,ad9963";
 		reg = <0>;
 		spi-max-frequency = <5000000>;
@@ -149,7 +150,8 @@
 			vref-supply = <&ref_1V2>;
 		};
 
-		dac@0f {
+		// was dac@0f
+		dac@f {
 			compatible = "adi,ad5627";
 			reg = <0x0f>;
 
