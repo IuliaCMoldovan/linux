@@ -43,54 +43,16 @@
 
 #include <linux/fpga/adi-axi-common.h>
 
-/* AXI TRIGGER REGS */
-#define ADI_REG_VERSION                 0X000
-#define ADI_REG_SCRATCH                 0x004
-#define ADI_REG_VALID_PROBES            0x008
+/* ADC Common */
+#define ADI_REG_RSTN			0x0040
+#define ADI_RSTN			(1 << 0)
 
-#define ADI_REG_TRIGGERS_REL            0x00C
-#define ADI_REG_TRIGGER_TYPE            0x010
-#define ADI_REG_FIFO_DEPTH              0x014
+#define ADI_REG_STATUS			0x005C
+#define ADI_REG_DMA_STATUS		0x0088
 
-/* channel 0 registers */
-#define ADI_REG_EDGE_DETECT_EN_0        0x040
-#define ADI_REG_RISE_EDGE_EN_0          0x044
-#define ADI_REG_FALL_EDGE_EN_0          0x048
-#define ADI_REG_LOW_LVL_EN_0            0x04C
-#define ADI_REG_HIGH_LVL_EN_0           0x050
-#define ADI_REG_LIMIT_0                 0x054
-#define ADI_REG_HYSTERESIS_0            0x058 
-#define ADI_REG_TRIGGER_ADC_0           0x05C
-
-/* channel 1 registers */
-#define ADI_REG_EDGE_DETECT_EN_1        0x060
-#define ADI_REG_RISE_EDGE_EN_1          0x064
-#define ADI_REG_FALL_EDGE_EN_1          0x068
-#define ADI_REG_LOW_LVL_EN_1            0x06C
-#define ADI_REG_HIGH_LVL_EN_1           0x070
-#define ADI_REG_LIMIT_1                 0x074
-#define ADI_REG_HYSTERESIS_1            0x078 
-#define ADI_REG_TRIGGER_ADC_1           0x07C
-
-/* channel 2 registers */
-#define ADI_REG_EDGE_DETECT_EN_2        0x080
-#define ADI_REG_RISE_EDGE_EN_2          0x084
-#define ADI_REG_FALL_EDGE_EN_2          0x088
-#define ADI_REG_LOW_LVL_EN_2            0x08C
-#define ADI_REG_HIGH_LVL_EN_2           0x090
-#define ADI_REG_LIMIT_2                 0x094
-#define ADI_REG_HYSTERESIS_2            0x098
-#define ADI_REG_TRIGGER_ADC_2           0x09C
-
-/* channel 3 registers */
-#define ADI_REG_EDGE_DETECT_EN_3        0x0A0
-#define ADI_REG_RISE_EDGE_EN_3          0x0A4
-#define ADI_REG_FALL_EDGE_EN_3          0x0A8
-#define ADI_REG_LOW_LVL_EN_3            0x0AC
-#define ADI_REG_HIGH_LVL_EN_3           0x0B0
-#define ADI_REG_LIMIT_3                 0x0B4
-#define ADI_REG_HYSTERESIS_3            0x0B8
-#define ADI_REG_TRIGGER_ADC_3           0x0BC
+/* ADC Channel */
+#define ADI_REG_CHAN_CNTRL(c)		(0x0400 + (c) * 0x40)
+#define ADI_ENABLE			(1 << 0)
 
 #define ID_AD_MC_ADC   1
 
@@ -99,16 +61,14 @@ struct axiadc_chip_info {
 	unsigned			num_channels;
 	const unsigned long		*scan_masks;
 	unsigned int			max_rate;
-	struct iio_chan_spec		channel[4];
+	struct iio_chan_spec		channel[3];
 };
 
 struct axiadc_state {
 	struct iio_info			iio_info;
 	void __iomem			*regs;
 	unsigned int			pcore_version;
-	unsigned int			test[4];
 };
-
 
 static inline void axiadc_write(struct axiadc_state *st, unsigned reg, unsigned val)
 {
@@ -129,6 +89,10 @@ static int axiadc_hw_submit_block(struct iio_dma_buffer_queue *queue,
 	block->block.bytes_used = block->block.size;
 
 	iio_dmaengine_buffer_submit_block(queue, block, DMA_FROM_DEVICE);
+
+	axiadc_write(st, ADI_REG_STATUS, ~0);
+	axiadc_write(st, ADI_REG_DMA_STATUS, ~0);
+
 	return 0;
 }
 
@@ -182,169 +146,48 @@ static int axiadc_update_scan_mode(struct iio_dev *indio_dev,
 {
 	struct axiadc_state *st = iio_priv(indio_dev);
 	unsigned i, ctrl;
-pr_err("%s: scan_mask = 0x%lx\n", __FUNCTION__, *scan_mask);
-	axiadc_write(st, ADI_REG_VALID_PROBES, *scan_mask);
 
-#if 0
 	for (i = 0; i < indio_dev->masklength; i++) {
-		//ctrl = axiadc_read(st, ADI_REG_CHAN_CNTRL(i));
+		ctrl = axiadc_read(st, ADI_REG_CHAN_CNTRL(i));
 
 		if (test_bit(i, scan_mask))
 			ctrl |= ADI_ENABLE;
 		else
 			ctrl &= ~ADI_ENABLE;
 
-		//axiadc_write(st, ADI_REG_CHAN_CNTRL(i), ctrl);
+		axiadc_write(st, ADI_REG_CHAN_CNTRL(i), ctrl);
 	}
-#endif
+
 	return 0;
-}
-
-static int axiadc_read_raw(struct iio_dev *indio_dev,
-			   struct iio_chan_spec const *chan,
-			   int *val, int *val2, long info)
-{
-	struct axiadc_state *st = iio_priv(indio_dev);
-
-	switch (info) {
-	case IIO_CHAN_INFO_RAW:
-		*val = st->test[chan->channel];
-		return IIO_VAL_INT;
-	case IIO_CHAN_INFO_ENABLE:
-		*val = 123;
-		return IIO_VAL_INT;
-	default:
-		return -EINVAL;
-	}
-}
-
-static int axiadc_write_raw(struct iio_dev *indio_dev,
-                            struct iio_chan_spec const *chan,
-                            int val, int val2, long info)
-{
-	struct axiadc_state *st = iio_priv(indio_dev);
-
-        switch (info) {
-        case IIO_CHAN_INFO_RAW:
-                st->test[chan->channel] =  val;
-                return 0;
-	case IIO_CHAN_INFO_ENABLE:
-		return 0;
-        default:
-                return -EINVAL;
-        }
 }
 
 static const struct iio_info axiadc_info = {
 	.debugfs_reg_access = &axiadc_reg_access,
 	.update_scan_mode = &axiadc_update_scan_mode,
-	.read_raw = axiadc_read_raw,
-	.write_raw = axiadc_write_raw,
-};
-#if 0
-static int axi_trig_set_trigger(struct iio_dev *indio_dev,
-	const struct iio_chan_spec *chan, unsigned int val)
-{
-	struct axiadc_state *st = iio_priv(indio_dev);
-	
-	// lock
-	mutex_lock(&indio_dev->mlock);
-	
-	if (chan->address == 0) 
-	{
-		// determin ce atribut e selectat si in functie de ala, scriu in registrul care trebuie
-		if ()
-		{
-			axiadc_write(st, ADI_REG_EDGE_DETECT_EN_0, 
-		}
-	} else if (chan->address == 1) {
-
-	} else if (chan->address == 2) {
-
-	} else if (chan->address == 3) {
-
-	}
-	
-
-
-
-
-	// unlock
-	mutex_unlock(&indio_dev->mlock);
-
-	return 0;
-}
-
-static int axi_trig_get_trigger(struct iio_dev *indio_dev,
-			const struct iio_chan_spec *chan) 
-{
-	struct axi_trig *axi_trig = iio_priv(indio_dev);
-
-	return axi_trig->trigger_pin_config[chan->address];
-}
-
-static const char * const axi_trig_trigger_items[] = {
-	"edge-any",
-	"edge-rising",
-	"edge-falling",
-	"level-low",
-	"level-high",
-	"limit",
-	"histerezis",
-	"trigger-adc",
 };
 
-static const struct iio_enum axi_trig_trigger_enum = {
-	.items = axi_trig_trigger_items,
-	.num_items = ARRAY_SIZE(axi_trig_trigger_items),
-	.set = axi_trig_set_trigger,
-	.get = axi_trig_get_trigger,
-};
-
-static const struct iio_chan_spec_ext_info axi_trig_info[] = {
-	IIO_ENUM("trigger", IIO_SEPARATE, &axi_trig_trigger_enum),
-	IIO_ENUM_AVAILABLE_SEPARATE("trigger", &axi_trig_trigger_enum),
-	{}
-};
-#endif
-
-#define AIM_CHAN_NOCALIB(_chan, _si, _bits, _sign)	\
-	{ .type = IIO_VOLTAGE,				\
-	  .indexed = 1,					\
-	  .channel = _chan,				\
-	  .scan_index = _si,				\
+#define AIM_CHAN_NOCALIB(_chan, _si, _bits, _sign)		  \
+	{ .type = IIO_VOLTAGE,					  \
+	  .indexed = 1,						 \
+	  .channel = _chan,					 \
+	  .scan_index = _si,						\
 	  .scan_type = {				\
 		.sign = _sign,				\
 		.realbits = _bits,			\
 		.storagebits = 16,			\
 		.shift = 0,				\
 	  },						\
-	  .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),	\
-	  .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_ENABLE)	\
 	}
 
 static const struct axiadc_chip_info axiadc_chip_info_tbl[] = {
 	[ID_AD_MC_ADC] = {
 		.name = "AD-MC-ADC",
 		.max_rate = 1000000UL,
-		.num_channels = 4,
+		.num_channels = 3,
 		.channel = {
-			AIM_CHAN_NOCALIB(0, 0, 12, 's'),
-			AIM_CHAN_NOCALIB(1, 1, 12, 's'),
-			AIM_CHAN_NOCALIB(2, 2, 12, 's'),
-			AIM_CHAN_NOCALIB(3, 3, 12, 's'),
-			//AIM_CHAN_NOCALIB(4, 4, 8, 'u'),
-			//AIM_CHAN_NOCALIB(5, 5, 8, 'u'),
-			//AIM_CHAN_NOCALIB(6, 6, 8, 'u'),
-			//AIM_CHAN_NOCALIB(7, 7, 8, 'u'),
-			//AIM_CHAN_NOCALIB(8, 8, 8, 'u'),
-			//AIM_CHAN_NOCALIB(9, 9, 8, 'u'),
-			//AIM_CHAN_NOCALIB(10, 10, 8, 'u'),
-			//AIM_CHAN_NOCALIB(11, 11, 8, 'u'),
-			//AIM_CHAN_NOCALIB(12, 12, 8, 'u'),
-			//AIM_CHAN_NOCALIB(13, 13, 8, 'u'),
-			//AIM_CHAN_NOCALIB(14, 14, 8, 'u'),
-			//AIM_CHAN_NOCALIB(15, 15, 8, 'u'),
+			AIM_CHAN_NOCALIB(0, 0, 16, 'u'),
+			AIM_CHAN_NOCALIB(1, 1, 16, 'u'),
+			AIM_CHAN_NOCALIB(2, 2, 16, 'u'),
 		},
 	},
 };
@@ -372,6 +215,12 @@ static int axiadc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, indio_dev);
 
+	/* Reset all HDL Cores */
+	axiadc_write(st, ADI_REG_RSTN, 0);
+	axiadc_write(st, ADI_REG_RSTN, ADI_RSTN);
+
+	st->pcore_version = axiadc_read(st, ADI_AXI_REG_VERSION);
+
 	indio_dev->dev.parent = &pdev->dev;
 	indio_dev->name = pdev->dev.of_node->name;
 	indio_dev->modes = INDIO_DIRECT_MODE;
@@ -382,9 +231,7 @@ static int axiadc_probe(struct platform_device *pdev)
 	st->iio_info = axiadc_info;
 	indio_dev->info = &st->iio_info;
 
-pr_err("%s: %d\n", __FUNCTION__, __LINE__);
-
-	ret = axiadc_configure_ring_stream(indio_dev, "dma-trigger");
+	ret = axiadc_configure_ring_stream(indio_dev, "ad-mc-adc-dma");
 	if (ret < 0)
 		return ret;
 
@@ -395,8 +242,7 @@ pr_err("%s: %d\n", __FUNCTION__, __LINE__);
 	dev_info(&pdev->dev, "ADI AIM (0x%X) at 0x%08llX mapped to 0x%p, probed ADC %s as %s\n",
 		 st->pcore_version,
 		 (unsigned long long)mem->start, st->regs, chip_info->name,
-		 //axiadc_read(st, ADI_AXI_REG_ID) ? "SLAVE" : "MASTER");
-		 "MASTER");
+		 axiadc_read(st, ADI_AXI_REG_ID) ? "SLAVE" : "MASTER");
 
 	return 0;
 
