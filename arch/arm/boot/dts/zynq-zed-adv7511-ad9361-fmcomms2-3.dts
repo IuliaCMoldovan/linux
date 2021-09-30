@@ -86,9 +86,10 @@
 		dmas = <&tx_dma 0>;
 		dma-names = "tx";
 	};
-
+	
+	// was axi-ad-mc-adc-1.00.a
         trigger@43C000000 {
-                compatible = "xlnx,axi-ad-mc-adc-1.00.a";
+                compatible = "xlnx,axi-trigger";
                 reg = <0x43C00000 0x10000>;
                 dmas = <&dma_trigger 0>;
                 dma-names = "dma-trigger";

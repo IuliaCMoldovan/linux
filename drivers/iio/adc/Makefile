@@ -80,6 +80,8 @@ obj-$(CONFIG_AD9467) += ad9467.o
 obj-$(CONFIG_AD9680) += ad9680.o
 obj-$(CONFIG_ADMC) += admc_adc.o admc_speed.o admc_ctrl.o ad_adc.o
 
+obj-$(CONFIG_AXI_TRIGGER) += axi_trigger.o
+
 obj-$(CONFIG_CF_AXI_TDD) += cf_axi_tdd.o
 obj-$(CONFIG_AXI_PULSE_CAPTURE) += axi_pulse_capture.o
 obj-$(CONFIG_AXI_FMCADC5_SYNC) += axi_fmcadc5_sync.o

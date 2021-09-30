@@ -5,6 +5,12 @@
 
 menu "Analog to digital converters"
 
+config AXI_TRIGGER
+	tristate "AXI Trigger IP"
+	help
+	  Say yes here to build support Analog Devices AXI Trigger IP debugging 
+	  module.
+	
 config AD_SIGMA_DELTA
 	tristate
 	select IIO_BUFFER
