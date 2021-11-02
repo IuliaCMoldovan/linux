@@ -383,11 +383,17 @@ static long adf4360_clk_round_rate(struct clk_hw *hw,
 	unsigned int r, n;
 	unsigned int pfd_freq;
 
-	if (*parent_rate == 0)
+	if (*parent_rate == 0) {
+		pr_err("----------> %d: %s -> Parent rate e 0\n", __LINE__, __FUNCTION__);
 		return 0;
+	}
 
-	if (st->part_id == ID_ADF4360_9)
+	pr_err("----------> %d: %s -> Part id e %s\n", __LINE__, __FUNCTION__, st->part_id);
+
+	if (st->part_id == ID_ADF4360_9) {
+		pr_err("----------> %d: %s -> (Specific pentru _9) Clock round rate e %ld (fractie)\n", __LINE__, __FUNCTION__, (*parent_rate * st->n / st->r));
 		return *parent_rate * st->n / st->r;
+	}
 
 	if (rate > st->vco_max)
 		return st->vco_max;
@@ -397,14 +403,20 @@ static long adf4360_clk_round_rate(struct clk_hw *hw,
 		if (rate < st->vco_min / 2)
 			return st->vco_min / 2;
 		if (rate < st->vco_min && rate > st->vco_max / 2) {
-			if (st->vco_min - rate < rate - st->vco_max / 2)
+			if (st->vco_min - rate < rate - st->vco_max / 2) {
+				pr_err("----------> %d: %s -> st->vco-min e %d\n", __LINE__, __FUNCTION__, st->vco_min);
 				return st->vco_min;
-			else
+			}
+			else {
+				pr_err("----------> %d: %s -> st->vco_max e %d\n", __LINE__, __FUNCTION__, st->vco_max/2);
 				return st->vco_max / 2;
+			}
 		}
 	} else {
-		if (rate < st->vco_min)
+		if (rate < st->vco_min) {
+			pr_err("----------> %d: %s -> Rate e %d (st->vco_min)\n", __LINE__, __FUNCTION__, st->vco_min);
 			return st->vco_min;
+		}
 	}
 
 	r = DIV_ROUND_CLOSEST(*parent_rate, st->pfd_freq);
@@ -1014,19 +1026,24 @@ static int adf4360_get_clkin(struct adf4360_state *st)
 	int ret;
 
 	clk = devm_clk_get(dev, "clkin");
+	pr_err("----------> %d: %s -> devm_clk_get clkin\n", __LINE__, __FUNCTION__);
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
 	ret = clk_prepare_enable(clk);
+	pr_err("----------> %d: %s -> clk_prepare_enable\n", __LINE__, __FUNCTION__);
 	if (ret)
 		return ret;
 
 	ret = devm_add_action_or_reset(dev, adf4360_clkin_disable, st);
+	pr_err("----------> %d: %s -> devm_add_action_or_reset\n", __LINE__, __FUNCTION__);
 	if (ret)
 		return ret;
 
 	st->clkin = clk;
 	st->clkin_freq = clk_get_rate(clk);
+
+	pr_err("----------> %d: %s -> clkin_freq = %ld\n", __LINE__, __FUNCTION__, st->clkin_freq);
 
 	return 0;
 }
@@ -1047,11 +1064,14 @@ static int adf4360_clk_register(struct adf4360_state *st)
 	int ret;
 
 	parent_name = of_clk_get_parent_name(spi->dev.of_node, 0);
+
+	pr_err("----------> %d: %s -> Clock parent name %s\n", __LINE__, __FUNCTION__, parent_name);
 	if (!parent_name)
 		return -EINVAL;
 
 	init.name = st->clk_out_name;
 	init.ops = &adf4360_clk_ops;
+	pr_err("----------> round rate: %ld\n", adf4360_clk_ops.round_rate);
 	init.flags = CLK_SET_RATE_GATE;
 	init.parent_names = &parent_name;
 	init.num_parents = 1;
@@ -1059,13 +1079,17 @@ static int adf4360_clk_register(struct adf4360_state *st)
 	st->output.hw.init = &init;
 
 	clk = devm_clk_register(&spi->dev, &st->output.hw);
-	if (IS_ERR(clk))
+	if (IS_ERR(clk)) {
+		pr_err("----------> %d: %s -> Este eroare la clock %s\n", __LINE__, __FUNCTION__, clk);
 		return PTR_ERR(clk);
+	}
 
 	ret = of_clk_add_provider(spi->dev.of_node, of_clk_src_simple_get, clk);
+	pr_err("----------> %d: %s -> Dupa of_clk_add_provider: %d\n", __LINE__, __FUNCTION__, ret);
 	if (ret)
 		return ret;
 
+	pr_err("----------> %d: %s -> Inainte de devm_add_action_or_reset\n", __LINE__, __FUNCTION__);
 	return devm_add_action_or_reset(&spi->dev, adf4360_clk_del_provider, st);
 }
 
@@ -1089,18 +1113,29 @@ static int adf4360_parse_dt(struct adf4360_state *st)
 		ret = device_property_read_u32(dev,
 					       "adi,vco-minimum-frequency-hz",
 					       &tmp);
-		if (ret == 0)
+
+		pr_err("----------> %d: %s -> Parsez DTS pt _9: ret = %d\n", __LINE__, __FUNCTION__, ret);
+
+		if (ret == 0) {
 			st->vco_min = max(st->info->vco_min, tmp);
-		else
+			pr_err("----------> %d: %s -> Parsez DTS pt _9: st->vco_min = max... = %d\n", __LINE__, __FUNCTION__, st->vco_min);
+		}
+		else {
 			st->vco_min = st->info->vco_min;
+			pr_err("----------> %d: %s -> Parsez DTS pt _9: st->vco_min = st->info->vco_min = %d\n", __LINE__, __FUNCTION__, st->vco_min);
+		}
 
 		ret = device_property_read_u32(dev,
 					       "adi,vco-maximum-frequency-hz",
 					       &tmp);
-		if (ret == 0)
+		if (ret == 0) {
 			st->vco_max = min(st->info->vco_max, tmp);
-		else
+			pr_err("----------> %d: %s -> Parsez DTS pt _9: st->vco_max = min... = %d\n", __LINE__, __FUNCTION__, st->vco_max);
+		}
+		else {
 			st->vco_max = st->info->vco_max;
+			pr_err("----------> %d: %s -> Parsez DTS pt _9: st->vco_max = st->info->vco_max = %d\n", __LINE__, __FUNCTION__, st->vco_max);
+		}
 	} else {
 		st->vco_min = st->info->vco_min;
 		st->vco_max = st->info->vco_max;
@@ -1171,9 +1206,11 @@ static int adf4360_probe(struct spi_device *spi)
 
 	ret = adf4360_parse_dt(st);
 	if (ret) {
+		pr_err("----------> %d: %s -> Nu s-au putut parsa corect proprietatile din DTS => -ENODEV\n", __LINE__, __FUNCTION__);
 		dev_err(&spi->dev, "Parsing properties failed (%d)\n", ret);
 		return -ENODEV;
 	}
+	pr_err("----------> %d: %s -> Dupa parsare\n", __LINE__, __FUNCTION__);
 
 	indio_dev->dev.parent = &spi->dev;
 
@@ -1189,10 +1226,12 @@ static int adf4360_probe(struct spi_device *spi)
 	st->output.indio_dev = indio_dev;
 
 	ret = adf4360_get_gpio(st);
+	pr_err("----------> %d: %s -> Dupa get_gpio: %d\n", __LINE__, __FUNCTION__, ret);
 	if (ret)
 		return ret;
 
 	ret = adf4360_get_clkin(st);
+	pr_err("----------> %d: %s -> Dupa get_clkin: %d\n", __LINE__, __FUNCTION__, ret);
 	if (ret)
 		return ret;
 
@@ -1211,6 +1250,7 @@ static int adf4360_probe(struct spi_device *spi)
 		return ret;
 
 	ret = adf4360_clk_register(st);
+	pr_err("----------> %d: %s -> Dupa clk_register: %d\n", __LINE__, __FUNCTION__, ret);
 	if (ret)
 		return ret;
 
