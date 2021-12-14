@@ -183,7 +183,7 @@
 
 /* REG_PART_ID */
 #define PART_ID_PART_ID(x)		((((x) & 0xFF) << 0))
-#define AD9783_ID			0x24
+#define AD9783_ID			0x00 // according to datasheet
 
 #define AD9783_MIN_FSC			8580	// 8.58 mA
 #define AD9783_MAX_FSC			31700	// 31.6998 mA

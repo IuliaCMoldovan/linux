@@ -347,6 +347,8 @@ static int ad9783_probe(struct spi_device *spi)
 	unsigned id;
 	int ret;
 
+	pr_err("\n\n----------> Am intrat in probe <----------\n\n");
+
 	conv = devm_kzalloc(&spi->dev, sizeof(*conv), GFP_KERNEL);
 	if (conv == NULL)
 		return -ENOMEM;
@@ -355,13 +357,18 @@ static int ad9783_probe(struct spi_device *spi)
 	if (conv == NULL)
 		return -ENOMEM;
 
-	if (spi->dev.of_node)
+	if (spi->dev.of_node) {
 		phy->pdata = ad9783_parse_dt(&spi->dev);
-	else
+		pr_err("\n\n----------> Parsez devicetree-ul <----------\n\n");
+	}
+	else {
 		phy->pdata = spi->dev.platform_data;
+		pr_err("\n\n----------> Platform data <----------\n\n");
+	}
 	if (!phy->pdata) {
 		ret = -EINVAL;
 		dev_err(&spi->dev, "No platform data?\n");
+		pr_err("\n\n----------> Fara platform data <----------\n\n");
 		goto out;
 	}
 
@@ -369,13 +376,11 @@ static int ad9783_probe(struct spi_device *spi)
 
 	pr_err("\n\n----------> PART_ID = %d <----------\n\n", id);
 
-	/*
 	if (id != AD9783_ID) {
 		ret = -ENODEV;
 		dev_err(&spi->dev, "Unrecognized CHIP_ID 0x%X\n", id);
 		goto out;
 	}
-	*/
 	// bit 7 -> 0 = DAC input data is in 2's complement
 	//       -> 1 = DAC input data is in unsigned binary format
 	ad9783_write(spi, REG_DATA_CTRL, 0x80);
