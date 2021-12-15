@@ -80,42 +80,42 @@ static int ad9783_setup(struct cf_axi_converter *conv)
 	struct spi_device *spi = conv->spi;
 	int repeat, status;
 
+	/* Configure for the 4-wire SPI mode (bit 7) with MSB (bit 6). */
+	/* Software reset (bit 5) to default SPI values. */
+	ad9783_write(spi, REG_SPI_CTRL, 0x00);
+
+	// bit 7 -> 0 = DAC input data is in 2's complement
+	//       -> 1 = DAC input data is in unsigned binary format
+	ad9783_write(spi, REG_DATA_CTRL, 0x80);
+	ad9783_write(spi, REG_SETUP_HOLD, 0x27);
+	ad9783_write(spi, REG_SMP, 0x8); // 7 is the value from datasheet
+
 	return 0;
-
-	/* Configure for the 4-wire SPI mode with MSB. */
-	ad9783_write(spi, REG_MODE, 0x00);
-
-	/* Software reset to default SPI values. */
-	ad9783_write(spi, REG_MODE, MODE_RESET);
-
-	/* Clear the reset bit. */
-	ad9783_write(spi, REG_MODE, 0x00);
-
 	/* Set the common-mode voltage of DACCLK_P and DACCLK_N inputs */
-	ad9783_write(spi, REG_CROSS_CNT1, CROSS_CNT1_CLKP_OFFSET(0xF));
-	ad9783_write(spi, REG_CROSS_CNT2, CROSS_CNT2_CLKN_OFFSET(0xF));
+	//ad9783_write(spi, REG_CROSS_CNT1, CROSS_CNT1_CLKP_OFFSET(0xF));
+	//ad9783_write(spi, REG_CROSS_CNT2, CROSS_CNT2_CLKN_OFFSET(0xF));
 
 	/* Configure the Mu controller. */
-	ad9783_write(spi, REG_PHS_DET, PHS_DET_CMP_BST | PHS_DET_PHS_DET_AUTO_EN);
-	ad9783_write(spi, REG_MU_DUTY, MU_DUTY_MU_DUTY_AUTO_EN);
-	ad9783_write(spi, REG_MU_CNT2, MU_CNT2_SRCH_MODE(2) | MU_CNT2_SET_PHS(4));
-	ad9783_write(spi, REG_MU_CNT3, MU_CNT3_MUDEL(0x6C));
+	//ad9783_write(spi, REG_PHS_DET, PHS_DET_CMP_BST | PHS_DET_PHS_DET_AUTO_EN);
+	//ad9783_write(spi, REG_MU_DUTY, MU_DUTY_MU_DUTY_AUTO_EN);
+	//ad9783_write(spi, REG_MU_CNT2, MU_CNT2_SRCH_MODE(2) | MU_CNT2_SET_PHS(4));
+	//ad9783_write(spi, REG_MU_CNT3, MU_CNT3_MUDEL(0x6C));
 
-	for (repeat = 0; repeat < 3; repeat++) {
-		ad9783_write(spi, REG_MU_CNT4,
-		MU_CNT4_SEARCH_TOL | MU_CNT4_RETRY | MU_CNT4_GUARD(0xB));
-		ad9783_write(spi, REG_MU_CNT1, MU_CNT1_GAIN(1));
-		/* Enable the Mu controller search and track mode. */
-		ad9783_write(spi, REG_MU_CNT1, MU_CNT1_GAIN(1) | MU_CNT1_ENABLE);
-		mdelay(10);
-		status = ad9783_read(spi, REG_MU_STAT1);
-		if (status == MU_STAT1_MU_LKD)
-			return 0;
-	}
+	//for (repeat = 0; repeat < 3; repeat++) {
+	//	ad9783_write(spi, REG_MU_CNT4,
+	//	MU_CNT4_SEARCH_TOL | MU_CNT4_RETRY | MU_CNT4_GUARD(0xB));
+	//	ad9783_write(spi, REG_MU_CNT1, MU_CNT1_GAIN(1));
+	//	/* Enable the Mu controller search and track mode. */
+	//	ad9783_write(spi, REG_MU_CNT1, MU_CNT1_GAIN(1) | MU_CNT1_ENABLE);
+	//	mdelay(10);
+	//	status = ad9783_read(spi, REG_MU_STAT1);
+	//	if (status == MU_STAT1_MU_LKD)
+	//		return 0;
+	//}
 
-	dev_err(&spi->dev, "Mu lock failure\n\r");
+	//dev_err(&spi->dev, "Mu lock failure\n\r");
 
-	return -1;
+	//return -1;
 }
 
 static int ad9783_set_fsc(struct cf_axi_converter *conv, u16 fsc_ua)
@@ -127,8 +127,8 @@ static int ad9783_set_fsc(struct cf_axi_converter *conv, u16 fsc_ua)
 
 	fsc_ua = clamp_t(u16, fsc_ua, AD9783_MIN_FSC, AD9783_MAX_FSC);
 	reg_val = (fsc_ua - AD9783_MIN_FSC) * 10 / 226;
-	ret = ad9783_write(spi, REG_FSC_1, FSC_1_FSC_1(reg_val));
-	ret |= ad9783_write(spi, REG_FSC_2, FSC_2_FSC_2((reg_val >> 8)));
+	ret = ad9783_write(spi, REG_DAC_1_FSC, FSC_1_FSC_1(reg_val));
+	ret |= ad9783_write(spi, REG_DAC_2_FSC, FSC_2_FSC_2((reg_val >> 8)));
 	phy->pdata->fsc_ua = fsc_ua;
 
 	return ret;
@@ -149,11 +149,12 @@ static int ad9783_set_op_mode(struct cf_axi_converter *conv, enum operation_mode
 	struct ad9783_phy *phy = conv_to_phy(conv);
 	int ret;
 
+	// !!! TO BE DONE: separate the setting of the operation mode by DAC1 and DAC2
 	if (op_mode == NORMAL_BASEBAND_OPERATION) {
-		ret = ad9783_write(spi, REG_DEC_CNT, DEC_CNT_DAC_DEC(NORMAL_BASEBAND));
+		ret = ad9783_write(spi, REG_MIX_MODE, NORMAL_BASEBAND);
 		phy->pdata->mix_mode_en = false;
 	} else {
-		ret = ad9783_write(spi, REG_DEC_CNT, DEC_CNT_DAC_DEC(MIX_MODE));
+		ret = ad9783_write(spi, REG_MIX_MODE, MIX_MODE);
 		phy->pdata->mix_mode_en = true;
 	}
 
@@ -177,15 +178,16 @@ static int ad9783_prepare(struct cf_axi_converter *conv)
 
 	return 0;
 
+	/*
 	for (repeat = 0; repeat < 3; repeat++) {
-		/* Set FINE_DEL_SKEW to 2. */
+		// Set FINE_DEL_SKEW to 2.
 		ad9783_write(spi, REG_LVDS_REC_CNT4,
 		LVDS_REC_CNT4_DCI_DEL(0x7) | LVDS_REC_CNT4_FINE_DEL_SKEW(0x2));
-		/* Disable the data Rx controller before enabling it. */
+		// Disable the data Rx controller before enabling it.
 		ad9783_write(spi, REG_LVDS_REC_CNT1, 0x00);
-		/* Enable the data Rx controller for loop and IRQ. */
+		// Enable the data Rx controller for loop and IRQ.
 		ad9783_write(spi, REG_LVDS_REC_CNT1, LVDS_REC_CNT1_RCVR_LOOP_ON);
-		/* Enable the data Rx controller for search and track mode. */
+		// Enable the data Rx controller for search and track mode.
 		ad9783_write(spi, REG_LVDS_REC_CNT1,
 				LVDS_REC_CNT1_RCVR_LOOP_ON | LVDS_REC_CNT1_RCVR_CNT_ENA);
 		mdelay(10);
@@ -203,7 +205,9 @@ static int ad9783_prepare(struct cf_axi_converter *conv)
 		dev_err(&spi->dev, "Rx data lock failure\n\r");
 		return -1;
 	}
+	*/
 }
+
 
 static unsigned long long ad9783_get_data_clk(struct cf_axi_converter *conv)
 {
@@ -359,20 +363,18 @@ static int ad9783_probe(struct spi_device *spi)
 
 	if (spi->dev.of_node) {
 		phy->pdata = ad9783_parse_dt(&spi->dev);
-		pr_err("\n\n----------> Parsez devicetree-ul <----------\n\n");
 	}
 	else {
 		phy->pdata = spi->dev.platform_data;
-		pr_err("\n\n----------> Platform data <----------\n\n");
 	}
+
 	if (!phy->pdata) {
 		ret = -EINVAL;
 		dev_err(&spi->dev, "No platform data?\n");
-		pr_err("\n\n----------> Fara platform data <----------\n\n");
 		goto out;
 	}
 
-	id = ad9783_read(spi, REG_PART_ID);
+	id = (ad9783_read(spi, REG_VERSION_PART_ID) & 0x0F);
 
 	pr_err("\n\n----------> PART_ID = %d <----------\n\n", id);
 
@@ -381,11 +383,6 @@ static int ad9783_probe(struct spi_device *spi)
 		dev_err(&spi->dev, "Unrecognized CHIP_ID 0x%X\n", id);
 		goto out;
 	}
-	// bit 7 -> 0 = DAC input data is in 2's complement
-	//       -> 1 = DAC input data is in unsigned binary format
-	ad9783_write(spi, REG_DATA_CTRL, 0x80);
-	ad9783_write(spi, REG_SETUP_HOLD, 0x27);
-	ad9783_write(spi, REG_SMP, 0x8); // 7 is the value from datasheet
 
 	conv->phy = phy;
 	conv->write = ad9783_write;
